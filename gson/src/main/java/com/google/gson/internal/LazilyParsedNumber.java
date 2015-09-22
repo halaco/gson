@@ -25,9 +25,19 @@ import java.math.BigDecimal;
  */
 public final class LazilyParsedNumber extends Number {
   private final String value;
+  private transient BigDecimal bigDecimal;
 
   public LazilyParsedNumber(String value) {
     this.value = value;
+  }
+
+  private BigDecimal getBigDecimal() {
+    if (bigDecimal == null) {
+      // Standardize the internal presentation to make equals and hashCode return the same value
+      // for equivalent values like 120 and 1.2e2.
+      bigDecimal = new BigDecimal(value).stripTrailingZeros();
+    }
+    return bigDecimal;
   }
 
   @Override
@@ -38,7 +48,7 @@ public final class LazilyParsedNumber extends Number {
       try {
         return (int) Long.parseLong(value);
       } catch (NumberFormatException nfe) {
-        return new BigDecimal(value).intValue();
+        return getBigDecimal().intValue();
       }
     }
   }
@@ -48,7 +58,7 @@ public final class LazilyParsedNumber extends Number {
     try {
       return Long.parseLong(value);
     } catch (NumberFormatException e) {
-      return new BigDecimal(value).longValue();
+      return getBigDecimal().longValue();
     }
   }
 
@@ -67,12 +77,29 @@ public final class LazilyParsedNumber extends Number {
     return value;
   }
 
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj == null || getClass() != obj.getClass()) {
+      return false;
+    }
+    LazilyParsedNumber that = (LazilyParsedNumber)obj;
+    return getBigDecimal().equals((that.getBigDecimal()));
+  }
+
+  @Override
+  public int hashCode() {
+    return getBigDecimal().hashCode();
+  }
+
   /**
    * If somebody is unlucky enough to have to serialize one of these, serialize
    * it as a BigDecimal so that they won't need Gson on the other side to
    * deserialize it.
    */
   private Object writeReplace() throws ObjectStreamException {
-    return new BigDecimal(value);
+    return getBigDecimal();
   }
 }
